@@ -1,69 +1,98 @@
 AI-Powered Resume Parser
 
-FastAPI service that accepts PDF resumes, extracts text, sends it to Claude
-for structured extraction, and stores/serves the result through a REST API.
-API-key auth is enforced on every data endpoint.
+A FastAPI application that accepts PDF resumes, extracts text, and uses Groq LLaMA 3.3 70B to parse structured candidate information. All endpoints are protected with API key authentication.
 
-Setup
+Live Demo
+
+
+Swagger UI: https://resume-parser-75zn.onrender.com/docs
+Base URL: https://resume-parser-75zn.onrender.com
+
+
+Features
+
+
+Upload PDF resumes and extract structured data using an LLM
+Candidate list API with pagination and search
+Candidate details API with full profile
+API key authentication on all endpoints
+SQLite database for persistent storage
+
+
+Tech Stack
+
+
+Framework: FastAPI
+LLM: Groq API (LLaMA 3.3 70B)
+PDF Extraction: pdfplumber
+Database: SQLite + SQLAlchemy
+Deployment: Render
+
+
+API Endpoints
+
+MethodEndpointAuthDescriptionGET/healthNoHealth checkPOST/resumes/uploadYesUpload a PDF resumeGET/candidatesYesList all candidatesGET/candidates/{id}YesFull candidate details
+
+Setup & Run Locally
+
+1. Clone the repository
+
+bashgit clone https://github.com/cycli-city/resume-parser.git
+cd resume-parser
+
+2. Install dependencies
 
 bashpip install -r requirements.txt
-export ANTHROPIC_API_KEY=sk-ant-...      # required for parsing
-export API_KEYS=devkey123                # comma-separated list of valid client keys
-uvicorn app.main:app --reload
 
-Visit http://localhost:8000/docs for interactive Swagger UI (use the
-"Authorize" button to set X-API-Key).
+3. Create a .env file
 
-Endpoints
+GROQ_API_KEY=your_groq_api_key_here
+API_KEYS=devkey123
 
-MethodPathAuthDescriptionGET/healthnoLiveness checkPOST/resumes/uploadyesUpload a PDF, parse it, store the candidateGET/candidatesyesList candidates (page, page_size, search)GET/candidates/{id}yesFull structured detail incl. raw resume text
+4. Run the server
 
-Auth header: X-API-Key: <one of API_KEYS>
+bashpython -m uvicorn app.main:app --reload
 
-Example
+5. Open Swagger UI
 
-bashcurl -X POST http://localhost:8000/resumes/upload \
+Visit http://localhost:8000/docs
+
+Authentication
+
+All endpoints except /health require an X-API-Key header.
+
+X-API-Key: devkey123
+
+Example Usage
+
+Upload a Resume
+
+bashcurl -X POST https://resume-parser-75zn.onrender.com/resumes/upload \
   -H "X-API-Key: devkey123" \
   -F "file=@resume.pdf"
 
-curl http://localhost:8000/candidates?search=python \
+List Candidates
+
+bashcurl https://resume-parser-75zn.onrender.com/candidates \
   -H "X-API-Key: devkey123"
 
-curl http://localhost:8000/candidates/1 \
+Get Candidate Details
+
+bashcurl https://resume-parser-75zn.onrender.com/candidates/1 \
   -H "X-API-Key: devkey123"
 
-Design notes
+Project Structure
 
-
-PDF extraction: pdfplumber pulls raw text per page. Scanned/image-only
-PDFs (no extractable text layer) return a 422 — add OCR (e.g. pytesseract)
-if you need that case.
-LLM extraction: a single Claude call (app/llm.py) with a strict
-JSON-only system prompt defines the schema (name, email, phone, location,
-summary, years of experience, skills, education, experience). The model is
-claude-sonnet-4-6 by default, overridable via RESUME_PARSER_MODEL.
-Storage: SQLite via SQLAlchemy (resumes.db, path overridable via
-RESUME_DB_PATH). Structured lists (skills/education/experience) are
-stored as JSON text columns — fine at this scale; move to Postgres +
-native JSON/JSONB if you need concurrent writers or querying inside the
-arrays.
-Auth: deliberately simple shared-secret API keys via header
-(app/auth.py), matching what's needed for an internal/admin tool. Swap
-for JWT/OAuth2 if external clients need scoped tokens — only auth.py
-needs to change since every route just depends on require_api_key.
-
-
-Tests run during development
-
-Verified with FastAPI's TestClient:
-
-
-health check unauthenticated
-missing/invalid API key correctly rejected (422 / 401)
-full upload → list → detail flow against a generated sample PDF, with the
-LLM call mocked (no live API key in the build sandbox) to confirm PDF
-extraction, DB writes, and response shaping are all correct.
-
-
-You'll want to do one live run with a real ANTHROPIC_API_KEY and an actual
-resume PDF before treating this as fully verified end-to-end.
+resume-parser/
+├── app/
+│   ├── __init__.py
+│   ├── main.py        # FastAPI routes
+│   ├── auth.py        # API key authentication
+│   ├── db.py          # Database models
+│   ├── llm.py         # Groq LLM integration
+│   ├── pdf_utils.py   # PDF text extraction
+│   └── schemas.py     # Pydantic response schemas
+├── .env               # Environment variables (not committed)
+├── .python-version    # Python 3.11.9
+├── requirements.txt
+└── README.md
